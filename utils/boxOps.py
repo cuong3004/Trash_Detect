@@ -1,3 +1,6 @@
+import torch 
+
+
 class BoxUtils(object):
     @staticmethod
     def box_cxcywh_to_xyxy(x):
@@ -18,6 +21,13 @@ class BoxUtils(object):
         img_h, img_w = size
         b = BoxUtils.box_cxcywh_to_xyxy(out_bbox)
         b = b * torch.tensor([img_w, img_h, img_w, img_h], dtype=torch.float32)
+        return b
+    
+    @staticmethod
+    def downscale_bboxes(out_bbox, size):
+        img_h, img_w = size
+        b = BoxUtils.box_cxcywh_to_xyxy(out_bbox)
+        b = b / torch.tensor([img_w, img_h, img_w, img_h], dtype=torch.float32)
         return b
 
     @staticmethod

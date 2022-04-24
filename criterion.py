@@ -1,6 +1,8 @@
 import torch.nn as nn
 import torch
 from utils.boxOps import BoxUtils
+from scipy.optimize import linear_sum_assignment
+import torch.nn.functional as F
 
 class HungarianMatcher(nn.Module):
     """This class computes an assignment between the targets and the predictions of the network

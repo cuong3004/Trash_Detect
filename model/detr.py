@@ -52,7 +52,7 @@ class DETR(nn.Module):
         return out
 
 
-if __name__ == "__main__":
+def test():
     num_classes = 5
     num_queries = 100
     model = DETR(num_classes, num_queries)
@@ -60,3 +60,70 @@ if __name__ == "__main__":
     weight_dict = {'loss_ce': 1, 'loss_bbox': 5, 'loss_giou': 2}
     losses = ['labels', 'boxes', 'cardinality']
     criterion = SetCriterion(num_classes, matcher=matcher, weight_dict=weight_dict, eos_coef=0.1, losses=losses)
+
+    imgs = torch.randn((2,3,256,256))
+    outputs = model(imgs)
+
+    targets = [
+        {
+            "boxes":torch.tensor([[0.1,0.2,0.3,0.6], [0.5,0.6,0.7,0.8]]+[[0.0, 0.0, 1.0, 1.0] for i in range(40)]),
+            "labels": torch.tensor([1, 1]+[num_classes for i in range(40)])
+        },
+        {
+            "boxes":torch.tensor([[0.1,0.2,0.3,0.6], [0.5,0.6,0.7,0.8]]+[[0.0, 0.0, 1.0, 1.0] for i in range(98)]),
+            "labels": torch.tensor([1, 1]+[num_classes for i in range(98)])
+        }
+    ]
+
+    losses = criterion(outputs, targets)
+    print(sum(losses.values()), losses)
+
+def test_real():
+    from pathlib import Path
+    from custom_data import CustomData
+    import  torchvision.transforms as T
+    
+    root_data = Path("data")
+
+    transform = T.Compose([
+            T.ToTensor(),
+            T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+
+    data_train = CustomData(
+                    root=root_data/"train",
+                    annFile=root_data/'train'/'_annotations.coco.json',
+                    transforms=transform)
+    
+    data_loader = torch.utils.data.DataLoader(
+        data_train, 
+        batch_size=32, 
+        collate_fn=CustomData.collate_fn)
+
+    imags, targets = next(iter(data_loader))
+
+    num_classes = 5
+    num_queries = 100
+    model = DETR(num_classes, num_queries)
+    matcher = HungarianMatcher(cost_class = 1, cost_bbox = 5, cost_giou = 2)
+    weight_dict = {'loss_ce': 1, 'loss_bbox': 5, 'loss_giou': 2}
+    losses = ['labels', 'boxes', 'cardinality']
+    criterion = SetCriterion(num_classes, matcher=matcher, weight_dict=weight_dict, eos_coef=0.1, losses=losses)
+
+    outputs = model(imags)
+
+    # targets = [
+    #     {
+    #         "boxes":torch.tensor([[0.1,0.2,0.3,0.6], [0.5,0.6,0.7,0.8]]+[[0.0, 0.0, 1.0, 1.0] for i in range(40)]),
+    #         "labels": torch.tensor([1, 1]+[num_classes for i in range(40)])
+    #     },
+    #     {
+    #         "boxes":torch.tensor([[0.1,0.2,0.3,0.6], [0.5,0.6,0.7,0.8]]+[[0.0, 0.0, 1.0, 1.0] for i in range(98)]),
+    #         "labels": torch.tensor([1, 1]+[num_classes for i in range(98)])
+    #     }
+    # ]
+
+    losses = criterion(outputs, targets)
+    print(sum(losses.values()), losses)
+
+# 

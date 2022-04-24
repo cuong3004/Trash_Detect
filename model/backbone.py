@@ -3,7 +3,8 @@ from model.frozenbatchnorm import FrozenBatchNorm2d
 from model.pe import PositionEmbeddingSine
 import torch 
 from torchvision.models._utils import IntermediateLayerGetter
-
+import torch.nn as nn
+import torch.nn.functional as F
 
 class Backbone(nn.Module):
     """ResNet backbone with frozen BatchNorm."""
@@ -43,8 +44,8 @@ class Backbone(nn.Module):
             m = F.interpolate(mask[None].float(), size=x.shape[-2:]).to(torch.bool)[0]
             pos = self.position_embedding(x, m).to(x.dtype)
             out[name] = (x, m, pos)
-        print(out.keys())
+        # print(out.keys())
         # print(out[self.body.return_layers["layer4"]])
-        for i in out[self.body.return_layers["layer4"]]:
-            print(i.shape)
+        # for i in out[self.body.return_layers["layer4"]]:
+            # print(i.shape)
         return out[self.body.return_layers["layer4"]]
