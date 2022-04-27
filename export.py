@@ -1,3 +1,4 @@
+
 # from torchmetrics.functional import accuracy 
 # from torchmetrics import Precision, Recall, F1Score, Accuracy
 from model.detr import DETR
@@ -45,6 +46,28 @@ class LitClassification(pl.LightningModule):
         losses = ['labels', 'boxes', 'cardinality']
         self.criterion = SetCriterion(num_classes, matcher=matcher, weight_dict=weight_dict, eos_coef=0.1, losses=losses)
 
+        # outputs = model(imags)
+        # self.precision = Precision(num_classes = 4, average="macro")
+        # self._accuracy =  Accuracy(num_classes = 4, average="macro")
+        # self._f1 = F1Score(num_classes = 4, average="macro")
+        # self._recall = Recall(num_classes = 4, average="macro")
+        # self._precision = Precision(num_classes = 4, average="macro")
+    
+    # def setup_metric(self):
+
+    #     self.name_states = ["train", "valid", "test"]
+    #     self.name_types = ["acc", "f1", "recall", "precision"]
+        
+    #     metric_dict = {
+    #         "acc": Accuracy,
+    #         "f1": F1Score
+    #     }
+    #     for name_state in ["train", "valid", "test"]:
+    #         setattr(self, f"{name_state}_acc", Accuracy(num_classes = 4, average="macro"))
+    #         setattr(self, f"{name_state}_f1", F1Score(num_classes = 4, average="macro"))
+    #         setattr(self, f"{name_state}_recall", Recall(num_classes = 4, average="macro"))
+    #         setattr(self, f"{name_state}_precision", Precision(num_classes = 4, average="macro"))
+        
     def shared_step(self, batch, mode, **kwargs):
         images, targets = batch
         out = self.detr(images) 
@@ -53,92 +76,44 @@ class LitClassification(pl.LightningModule):
         loss = sum(loss.values())
 
         self.log(f'{mode}_loss', loss.item(), **kwargs)
+
+        # self.log(f'{mode}_acc', self._accuracy(out, y), **kwargs)
+        # self.log(f'{mode}_f1', self._f1(out, y), **kwargs)
+        # self.log(f'{mode}_precision', self._precision(out, y), **kwargs)
+        # self.log(f'{mode}_recall', self._recall(out, y), **kwargs)
+
         return loss
 
     def configure_optimizers(self):
+        # optimizer = AdamW(self.parameters(),
+        #           lr = 2e-3, # args.learning_rate - default is 5e-5,
+        #           eps = 1e-8 # args.adam_epsilon  - default is 1e-8.
+        #         )
+        # total_steps = len(train_loader) * Epoch
+
+        # # Create the learning rate scheduler.
+        # scheduler = get_linear_schedule_with_warmup(optimizer, 
+        #                 num_warmup_steps = 0, # Default value in run_glue.py
+        #                 num_training_steps = total_steps)
+        # return [optimizer], [scheduler]
         return torch.optim.Adam(self.detr.parameters(), lr=0.0001)
 
 
     def training_step(self, train_batch, batch_idx):
+
         loss = self.shared_step(train_batch, "train", on_step=False, on_epoch=True)
+
         return loss
 
     def validation_step(self, val_batch, batch_idx):
+
         self.shared_step(val_batch, "valid", on_step=False, on_epoch=True)
 
     def test_step(self, batch, batch_idx):
         self.shared_step(batch, "test")
-    
-    def predict_step(self, batch, batch_idx):
-        images, targets = batch
-        out = self.detr(images) 
-        return out["pred_logits"], out["pred_boxes"]
-    
-    def _out2json(self, out):
-        pred_logits = out["pred_logits"]
-        pred_boxes =  out["pred_boxes"]
-
-    def on_predict_epoch_end(self, outputs):
-        pred_logits = [output[0] for output in outputs]
-        pred_boxes = [output[1] for output in outputs]
-        assert len(pred_logits) == len(pred_boxes)
-
-        pred_logits = torch.cat(pred_logits)
-        pred_boxes = torch.cat(pred_boxes)
 
 
+model = DETR(num_classes=4, num_queries=100)
 
 
-
-root_data = Path("data")
-
-transform_train = T.Compose([
-        T.ToTensor(),
-        T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-    ])
-
-transform_valid = T.Compose([
-        T.ToTensor(),
-        T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-    ])
-
-data_train = CustomData(
-                root=root_data/"train",
-                annFile=root_data/'train'/'_annotations.coco.json',
-                transforms=transform_train)
-
-data_valid = CustomData(
-                root=root_data/"valid",
-                annFile=root_data/'valid'/'_annotations.coco.json',
-                transforms=transform_train)
-
-train_loader = torch.utils.data.DataLoader(
-    data_train, 
-    batch_size=32, 
-    collate_fn=CustomData.collate_fn)
-
-valid_loader = torch.utils.data.DataLoader(
-    data_train, 
-    batch_size=32, 
-    collate_fn=CustomData.collate_fn)
-
-# trainer = pl.Trainer(max_epochs=20)
-# trainer.fit(LitClassification(), train_loader,)
-# trainer.predict(valid_loader)
-
-trainer = pl.Trainer(gpus=1, max_epochs=1)
-lit = LitClassification()
-trainer.fit(lit, train_loader,)
-
-x = torch.randn(2, 3, 320, 320, requires_grad=True)
-lit.detr.eval()
-torch_out = lit.detr(x)
-
-# Export the model
-torch.onnx.export(lit.detr,               # model being run
-                  x,                         # model input (or a tuple for multiple inputs)
-                  "super_resolution.onnx",   # where to save the model (can be a file or file-like object)
-                  opset_version=12,          # the ONNX version to export the model to
-                  input_names = ['input'],   # the model's input names
-                  output_names = ['output', 'output2'], # the model's output names
-)
+k_model = pytorch_to_keras(model, input_var, [(10, 32, 32,)], verbose=True, names='short')  

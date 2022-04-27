@@ -48,7 +48,7 @@ class DETR(nn.Module):
         )
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
-        out = {'pred_logits': outputs_class.permute(1, 0, 2), 'pred_boxes': outputs_coord.permute(1, 0, 2)}
+        out = {'pred_logits': outputs_class.permute(1, 0, 2), 'pred_boxes': outputs_coord.permute(1, 0, 2)} # [2, 100, 6]
         return out
 
 
