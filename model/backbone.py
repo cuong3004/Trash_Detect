@@ -1,10 +1,15 @@
-import torchvision
+import torch
 from model.frozenbatchnorm import FrozenBatchNorm2d
 from model.pe import PositionEmbeddingSine
 import torch 
 from torchvision.models._utils import IntermediateLayerGetter
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.models
+
+# def get_backbone_resnet18():
+#     backbone = resnet18()
+#     return
 
 class Backbone(nn.Module):
     """ResNet backbone with frozen BatchNorm."""
@@ -37,15 +42,40 @@ class Backbone(nn.Module):
 
     def forward(self, x, mask = None):
         mask = mask or torch.zeros_like(x[:,0], dtype = torch.bool)
-        xs = self.body(x)
-        out = {}
-        for name, x in xs.items():
-            # print(x.shape)
-            m = F.interpolate(mask[None].float(), size=x.shape[-2:]).to(torch.bool)[0]
-            pos = self.position_embedding(x, m).to(x.dtype)
-            out[name] = (x, m, pos)
+
+        x = self.backbone.conv1(x)
+        x = self.backbone.bn1(x)
+        x = self.backbone.relu(x)
+        x = self.backbone.maxpool(x)
+
+        x = self.backbone.layer1(x)
+        x = self.backbone.layer2(x)
+        x = self.backbone.layer3(x)
+        x = self.backbone.layer4(x)
+
+        m = F.interpolate(mask[None].float(), size=x.shape[-2:]).to(torch.bool)[0]
+        pos = self.position_embedding(x, m).to(x.dtype)
+
+        # out = {}
+        # for name, x in xs.items():
+        #     # print(x.shape)
+        #     m = F.interpolate(mask[None].float(), size=x.shape[-2:]).to(torch.bool)[0]
+        #     pos = self.position_embedding(x, m).to(x.dtype)
+        #     out[name] = (x, m, pos)
         # print(out.keys())
         # print(out[self.body.return_layers["layer4"]])
         # for i in out[self.body.return_layers["layer4"]]:
             # print(i.shape)
-        return out[self.body.return_layers["layer4"]]
+        # return out[self.body.return_layers["layer4"]]
+
+        return x, m, pos
+
+def test_export():
+    model = Backbone("resnet18")
+
+    x = torch.rand(2,3,320,320)
+    x, m, pos = model(x)
+
+    print(x.shape, m.shape, pos.shape)
+
+    # print(model)
