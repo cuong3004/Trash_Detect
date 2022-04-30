@@ -1,9 +1,8 @@
 from torchvision.datasets.coco import CocoDetection
 from pathlib import Path
-import torch 
+import torch
 from typing import Any, Callable, Optional, Tuple, List
 from utils.boxOps import BoxUtils
-
 
 
 class CustomData(CocoDetection):
@@ -14,11 +13,11 @@ class CustomData(CocoDetection):
 
         if self.transforms is not None:
             image = self.transforms(image)
-        
+
         target = self._preprocess_target(image, target)
 
         return image, target
-    
+
     def _preprocess_target(self, image, target):
         target_new = {}
         boxxes = []
@@ -30,7 +29,7 @@ class CustomData(CocoDetection):
 
             boxxes.append(bbox)
             categories_id.append(category)
-        
+
         boxxes = torch.stack(boxxes)
         categories_id = torch.stack(categories_id)
 
@@ -49,33 +48,27 @@ class CustomData(CocoDetection):
         images = torch.stack(images)
         return images, targets
 
+
 def test():
-    import  torchvision.transforms as T
-    
+    import torchvision.transforms as T
+
     root_data = Path("data")
 
     transform = T.Compose([
-            T.ToTensor(),
-            T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-        ])
+        T.ToTensor(),
+        T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    ])
 
     data_train = CustomData(
-                    root=root_data/"train",
-                    annFile=root_data/'train'/'_annotations.coco.json',
-                    transforms=transform)
+        root=root_data / "train",
+        annFile=root_data / 'train' / '_annotations.coco.json',
+        transforms=transform)
 
-    
     data_loader = torch.utils.data.DataLoader(
-        data_train, 
-        batch_size=32, 
+        data_train,
+        batch_size=32,
         collate_fn=CustomData.collate_fn)
-
-
-
 
     print(next(iter(data_loader)))
 
-
     print("Okela")
-
-

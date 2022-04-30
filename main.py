@@ -1,31 +1,31 @@
 from pe import PositionEmbeddingSine, Joiner
 from mobile_vit import mobilevit_s
 import torch.nn as nn
-import torch 
+import torch
+
 
 class Detr(nn.Module):
     """
     Implement Detr
     """
 
-    def __init__(self, 
-            image_size=(320,320),
-            num_classes=4,
-            hidden_dim=256,
-            num_queries=100,
-            nheads=8,
-            dropout=0.1,
-            dim_feedforward=2048,
-            enc_layers=6,
-            dec_layers=6,
-            pre_norm = False,
-            deep_supervision=True,
-            giou_weight = 2.0,
-            l1_weight = 5.0,
-            no_object_weight = 1.0,
-            ):
+    def __init__(self,
+                 image_size=(320, 320),
+                 num_classes=4,
+                 hidden_dim=256,
+                 num_queries=100,
+                 nheads=8,
+                 dropout=0.1,
+                 dim_feedforward=2048,
+                 enc_layers=6,
+                 dec_layers=6,
+                 pre_norm=False,
+                 deep_supervision=True,
+                 giou_weight=2.0,
+                 l1_weight=5.0,
+                 no_object_weight=1.0,
+                 ):
         super().__init__()
-
 
         N_steps = hidden_dim // 2
         vit_backbone = mobilevit_s()
@@ -33,19 +33,16 @@ class Detr(nn.Module):
 
         transformer = nn.Transformer(
             hidden_dim=hidden_dim,
-            nhead=nheads, 
-            num_encoder_layers=enc_layers, 
+            nhead=nheads,
+            num_encoder_layers=enc_layers,
             num_decoder_layers=dec_layers,
             dropout=dropout,
             dim_feedforward=dim_feedforward
-            )
+        )
 
         self.detr = DETR(
             backbone, transformer, num_classes=self.num_classes, num_queries=num_queries, aux_loss=deep_supervision
         )
-
-
-
 
         # self.device = torch.device(cfg.MODEL.DEVICE)
 
@@ -202,7 +199,7 @@ class Detr(nn.Module):
         scores, labels = F.softmax(box_cls, dim=-1)[:, :, :-1].max(-1)
 
         for i, (scores_per_image, labels_per_image, box_pred_per_image, image_size) in enumerate(zip(
-            scores, labels, box_pred, image_sizes
+                scores, labels, box_pred, image_sizes
         )):
             result = Instances(image_size)
             result.pred_boxes = Boxes(box_cxcywh_to_xyxy(box_pred_per_image))
@@ -229,11 +226,6 @@ class Detr(nn.Module):
         return images
 
 
-
-
-
-
-
 class DETRdemo(nn.Module):
     """
     Demo DETR implementation.
@@ -246,6 +238,7 @@ class DETRdemo(nn.Module):
     The model achieves ~40 AP on COCO val5k and runs at ~28 FPS on Tesla V100.
     Only batch size 1 supported.
     """
+
     def __init__(self, num_classes, hidden_dim=256, nheads=8,
                  num_encoder_layers=6, num_decoder_layers=6):
         super().__init__()
@@ -278,7 +271,7 @@ class DETRdemo(nn.Module):
         self.criterion = SetCriterion(
             self.num_classes, matcher=matcher, weight_dict=weight_dict, eos_coef=no_object_weight, losses=losses,
         )
-        
+
     def forward(self, inputs):
         # propagate inputs through ResNet-50 up to avg-pool layer
         # x = self.backbone.conv1(inputs)
@@ -305,6 +298,3 @@ class DETRdemo(nn.Module):
         # propagate through the transformer
         h = self.transformer(pos + 0.1 * h.flatten(2).permute(2, 0, 1),
                              self.query_pos.unsqueeze(1)).transpose(0, 1)
-
-
-        

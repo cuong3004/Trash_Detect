@@ -36,7 +36,7 @@ class DETR(nn.Module):
 
     def forward(self, x):
         features, mask, pos_embed = self.backbone(x)
-        src = self.input_proj(features).flatten(2).permute(2, 0, 1)
+        src = self.input_proj(features).flatten(2).permute(2, 0, 1) # [64,2,256]
         pos_embed = pos_embed.flatten(2).permute(2, 0, 1)
         mask = mask.flatten(1)
 
