@@ -12,7 +12,8 @@ from pathlib import Path
 from custom_data import CustomData
 import torchvision.transforms as T
 from pycocotools.cocoeval import COCOeval
-
+import json
+import numpy as np
 
 class LitClassification(pl.LightningModule):
     def __init__(self,
@@ -43,7 +44,7 @@ class LitClassification(pl.LightningModule):
             num_decoder_layers=dec_layers,
             dim_feedforward=dim_feedforward,
             dropout=dropout,
-            activation="gelu",
+            # activation="gelu",
         )
         self.detr = DETR(num_classes=num_classes, num_queries=num_queries, transformer=transformer)
         matcher = HungarianMatcher(cost_class=1, cost_bbox=5, cost_giou=2)
@@ -80,55 +81,79 @@ class LitClassification(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         self.shared_step(batch, "test")
 
-    # def predict_step(self, batch, batch_idx):
-    def validation_step(self, batch, batch_idx):
+    def predict_step(self, batch, batch_idx):
+        # def validation_step(self, batch, batch_idx):
         images, targets = batch
         out = self.detr(images)
-        return out["pred_logits"], out["pred_boxes"]
+        return {"pred_logits": out["pred_logits"],
+                "pred_boxes": out["pred_boxes"]}
 
     def _out2json(self, out):
         pred_logits = out["pred_logits"]
         pred_boxes = out["pred_boxes"]
 
     def on_predict_epoch_end(self, outputs):
-        pred_logits = [output[0] for output in outputs]
-        pred_boxes = [output[1] for output in outputs]
+        # print(type(outputs))
+        # # pred_logits, pred_boxes = outputs
+        # print("len_output", len(outputs))
+        # print("len_output_con", len(outputs[0]))
+        # def on_validation_epoch_end(self, outputs):
+        pred_logits = [output["pred_logits"] for output in outputs[0]]
+        pred_boxes = [output["pred_boxes"] for output in outputs[0]]
         assert len(pred_logits) == len(pred_boxes)
+        # print(pred_logits)
+
+        # print(pred_boxes)
 
         pred_logits = torch.cat(pred_logits)
         pred_boxes = torch.cat(pred_boxes)
 
+        # print(pred_logits.shape)
+        # print(pred_boxes.shape)
+
         pred_probas = pred_logits.softmax(-1)[:, :, :-1]
         keep = pred_probas.max(-1).values > 0.5
+        # print(keep.shape)
+        # print(pred_boxes[keep])
+        # print(pred_boxes[keep])
+        bboxes_scaled = [BoxUtils.rescale_bboxes(pre_box, (320, 320)) for pre_box in pred_boxes]
+        # pred_probas = pred_probas[keep]
+        # cls = pred_probas.argmax()
 
-        bboxes_scaled = BoxUtils.rescale_bboxes(pred_boxes[:, keep], (320,320))
-        pred_probas = pred_probas[keep]
+        # idxs = torch.arange(cls.size)
+        # print(len(bboxes_scaled))
+        #
+        # print("Box scale ok")
 
         # idxes = torch.arange(pred_logits.shape[0], type=torch.int64)
         pred_result = []
         for idx, (boxes, prob) in enumerate(zip(bboxes_scaled, pred_probas)):
+            print(len(prob))
             for p, (xmin, ymin, xmax, ymax) in zip(prob, boxes.tolist()):
                 cl = p.argmax()
                 score = p[cl]
-                target_pred = {"image_id":idx,
-                               "category_id":cl+1,
-                               "bbox":[xmin, ymin, xmax, ymax],
-                               "score":score}
-                pred_result.append(target_pred)
+                target_pred = {"image_id": idx,
+                               "bbox": [xmin, ymin, xmax, ymax],
+                               "score": score,
+                               "category_id": cl + 1,
+                               }
+                pred_result.append([idx, xmin, ymin, xmax, ymax, score, cl + 1])
 
-        cocoGt = copy.deepcopy(self.test_coco)
+        # with open("result.json", "w") as f:
+        #     f.write(str(pred_result))
+        pred_result = np.asarray(pred_result)
+
+        cocoGt = copy.deepcopy(self.valid_coco)
         cocoDt = cocoGt.loadRes(pred_result)
 
-        cocoEval = COCOeval(cocoGt,cocoDt,self.annType)
+        cocoEval = COCOeval(cocoGt, cocoDt, self.annType)
         # cocoEval.params.imgIds = imgIds
         cocoEval.evaluate()
         cocoEval.accumulate()
         cocoEval.summarize()
 
-
         # return
         # target_pred = {}
-
 
 
 root_data = Path("data")
@@ -155,12 +180,12 @@ data_valid = CustomData(
 
 train_loader = torch.utils.data.DataLoader(
     data_train,
-    batch_size=32,
+    batch_size=10,
     collate_fn=CustomData.collate_fn)
 
 valid_loader = torch.utils.data.DataLoader(
     data_train,
-    batch_size=32,
+    batch_size=10,
     collate_fn=CustomData.collate_fn)
 
 # trainer = pl.Trainer(max_epochs=20)
@@ -170,8 +195,9 @@ valid_loader = torch.utils.data.DataLoader(
 trainer = pl.Trainer(gpus=1, max_epochs=1)
 lit = LitClassification(
     train_coco=data_train.coco,
-    valid_coco=data_valid.coco,)
-trainer.fit(lit, train_loader, valid_loader)
+    valid_coco=data_valid.coco, )
+trainer.fit(lit, train_loader)
+trainer.predict(lit, valid_loader)
 
 # x = torch.randn(2, 3, 320, 320, requires_grad=True)
 # lit.detr.eval()
