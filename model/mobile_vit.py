@@ -4,6 +4,7 @@ import torch.nn as nn
 from einops import rearrange
 from einops.layers.torch import Reduce
 
+
 # helpers
 
 def conv_1x1_bn(inp, oup):
@@ -13,12 +14,14 @@ def conv_1x1_bn(inp, oup):
         nn.SiLU()
     )
 
+
 def conv_nxn_bn(inp, oup, kernal_size=3, stride=1):
     return nn.Sequential(
         nn.Conv2d(inp, oup, kernal_size, stride, 1, bias=False),
         nn.BatchNorm2d(oup),
         nn.SiLU()
     )
+
 
 # classes
 
@@ -45,6 +48,7 @@ class FeedForward(nn.Module):
 
     def forward(self, x):
         return self.net(x)
+
 
 class Attention(nn.Module):
     def __init__(self, dim, heads=8, dim_head=64, dropout=0.):
@@ -77,6 +81,7 @@ class Attention(nn.Module):
         out = rearrange(out, 'b p h n d -> b p n (h d)')
         return self.to_out(out)
 
+
 class Transformer(nn.Module):
     """Transformer block described in ViT.
     Paper: https://arxiv.org/abs/2010.11929
@@ -97,6 +102,7 @@ class Transformer(nn.Module):
             x = attn(x) + x
             x = ff(x) + x
         return x
+
 
 class MV2Block(nn.Module):
     """MV2 block described in MobileNetV2.
@@ -145,6 +151,7 @@ class MV2Block(nn.Module):
             out = out + x
         return out
 
+
 class MobileViTBlock(nn.Module):
     def __init__(self, dim, depth, channel, kernel_size, patch_size, mlp_dim, dropout=0.):
         super().__init__()
@@ -171,13 +178,14 @@ class MobileViTBlock(nn.Module):
                       ph=self.ph, pw=self.pw)
         x = self.transformer(x)
         x = rearrange(x, 'b (ph pw) (h w) d -> b d (h ph) (w pw)',
-                      h=h//self.ph, w=w//self.pw, ph=self.ph, pw=self.pw)
+                      h=h // self.ph, w=w // self.pw, ph=self.ph, pw=self.pw)
 
         # Fusion
         x = self.conv3(x)
         x = torch.cat((x, y), 1)
         x = self.conv4(x)
         return x
+
 
 class MobileViT(nn.Module):
     """MobileViT.
@@ -186,15 +194,15 @@ class MobileViT(nn.Module):
     """
 
     def __init__(
-        self,
-        image_size,
-        dims,
-        channels,
-        num_classes,
-        expansion=4,
-        kernel_size=3,
-        patch_size=(2, 2),
-        depths=(2, 4, 3)
+            self,
+            image_size,
+            dims,
+            channels,
+            num_classes,
+            expansion=4,
+            kernel_size=3,
+            patch_size=(2, 2),
+            depths=(2, 4, 3)
     ):
         super().__init__()
         assert len(dims) == 3, 'dims must be a tuple of 3'
