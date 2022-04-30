@@ -1,2 +1,4 @@
 pytorch-lightning
-
+onnx
+onnxruntime
+git+https://github.com/onnx/onnx-tensorflow.git
